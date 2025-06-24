@@ -1,150 +1,590 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF Compressor</title>
+    <title>Super Kompresor - Kompres File Cepat & Aman</title>
+    
+    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons from Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- JavaScript Libraries -->
+    <!-- JSZip for ZIP-based files (ZIP, DOCX, XLSX) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <style>
+        /* Custom styles for better UX */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5; /* Light gray background */
+        }
+        .dark body {
+            background-color: #111827; /* Dark mode background */
+        }
+
+        /* Custom dropzone styling */
+        .drop-zone {
+            border: 3px dashed #cbd5e1;
+            transition: all 0.3s ease-in-out;
+        }
+        .drop-zone-over {
+            border-color: #3b82f6; /* Blue border on drag over */
+            background-color: #eff6ff; /* Lighter blue background */
+        }
+        .dark .drop-zone-over {
+            border-color: #60a5fa;
+            background-color: #1f2937;
+        }
+
+        /* Custom progress bar animation */
+        .progress-bar-inner {
+            transition: width 0.4s ease-in-out;
+        }
+
+        /* Tooltip styling */
+        [data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 110%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #1f2937;
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            white-space: nowrap;
+            z-index: 10;
+        }
+    </style>
 </head>
-<body class="bg-gray-100">
-    <div class="container mx-auto p-4">
-        <h1 class="text-2xl font-bold mb-4">PDF Compressor</h1>
-        <div id="upload-area" class="border-2 border-dashed border-gray-300 p-6 text-center cursor-pointer hover:bg-gray-50">
-            <p>Drag and drop PDF files here or click to select</p>
-            <input type="file" id="file-input" multiple accept=".pdf" class="hidden">
-        </div>
-        <div id="file-list" class="mt-4"></div>
+<body class="dark:bg-gray-900 dark:text-gray-200">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-6xl">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-800 dark:text-white">
+                Super <span class="text-blue-500">Kompresor</span>
+            </h1>
+            <p class="text-lg text-gray-600 dark:text-gray-400 mt-2">
+                Kompresikan gambar, dokumen, video, dan audio Anda dengan mudah. Cepat, aman, dan sepenuhnya di browser Anda.
+            </p>
+        </header>
+
+        <main class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 md:p-8">
+            <!-- File Uploader -->
+            <div id="fileUploader" class="drop-zone rounded-xl p-8 text-center cursor-pointer mb-6">
+                <input type="file" id="fileInput" class="hidden" multiple>
+                <div class="flex flex-col items-center text-gray-500 dark:text-gray-400">
+                    <i class="ph-cloud-arrow-up text-6xl text-blue-500 mb-4"></i>
+                    <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300">Seret & Lepas File di Sini</h3>
+                    <p class="text-gray-500 dark:text-gray-400">atau</p>
+                    <button id="selectFileBtn" class="mt-4 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-6 rounded-lg transition-transform transform hover:scale-105">
+                        Pilih File
+                    </button>
+                    <p class="text-xs text-gray-400 mt-4">Privasi Anda Terjamin: Semua proses kompresi dilakukan di perangkat Anda.</p>
+                </div>
+            </div>
+
+            <!-- Compression Controls & File List -->
+            <div id="controlsAndFileList" class="hidden">
+                <!-- Compression Settings -->
+                <div class="bg-gray-50 dark:bg-gray-700 p-6 rounded-xl mb-6 flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div class="w-full md:w-1/2">
+                        <label for="compressionLevel" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tingkat Kompresi</label>
+                        <div class="relative">
+                            <input type="range" id="compressionLevel" min="1" max="6" value="3" class="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                            <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                <span>Sangat Cepat</span>
+                                <span>Seimbang</span>
+                                <span>Ultra</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="w-full md:w-auto flex items-center gap-4">
+                        <button id="compressBtn" class="w-full md:w-auto bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-8 rounded-lg flex items-center justify-center gap-2 text-lg transition-transform transform hover:scale-105">
+                            <i class="ph-play-fill"></i>
+                            Mulai Kompresi
+                        </button>
+                         <button id="clearBtn" class="w-full md:w-auto bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-lg flex items-center justify-center gap-2 transition-opacity hover:opacity-90">
+                            <i class="ph-trash-simple-fill"></i>
+                            Bersihkan
+                        </button>
+                    </div>
+                </div>
+
+                <!-- File List Container -->
+                <div id="fileListContainer" class="space-y-4">
+                    <!-- File items will be injected here by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Global Progress/Log Area for FFmpeg -->
+            <div id="ffmpegLogContainer" class="hidden mt-6 bg-gray-900 text-white rounded-lg p-4 font-mono text-xs max-h-48 overflow-y-auto">
+                <p class="font-bold mb-2">Log Proses Video/Audio:</p>
+                <pre id="ffmpegLog" class="whitespace-pre-wrap"></pre>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="text-center mt-8 text-sm text-gray-500 dark:text-gray-400">
+            <p>&copy; 2024 Dibuat dengan cinta untuk efisiensi. Super Kompresor.</p>
+        </footer>
+
     </div>
-    <script>
-        const uploadArea = document.getElementById('upload-area');
-        const fileInput = document.getElementById('file-input');
-        const fileList = document.getElementById('file-list');
-        let fileCounter = 0;
 
-        uploadArea.addEventListener('click', () => fileInput.click());
+    <!-- Web Worker Script for FFmpeg -->
+    <script id="ffmpeg-worker" type="text/worker">
+        // This script runs in a separate thread for heavy tasks
+        
+        // Load FFmpeg.wasm
+        self.importScripts("https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js");
+        const { createFFmpeg } = FFmpeg;
 
-        fileInput.addEventListener('change', handleFiles);
+        let ffmpeg;
 
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('bg-gray-200');
-        });
+        self.onmessage = async (e) => {
+            const { type, file, options, fileId } = e.data;
 
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('bg-gray-200');
-        });
+            if (type === 'load') {
+                ffmpeg = createFFmpeg({
+                    log: true, // Enables logging, which we can capture
+                    corePath: "https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js",
+                });
+                ffmpeg.setLogger(({ type, message }) => {
+                    // Post log messages back to the main thread
+                    self.postMessage({ type: 'log', message, fileId });
+                });
+                await ffmpeg.load();
+                self.postMessage({ type: 'loaded' });
+            } else if (type === 'compress') {
+                try {
+                    ffmpeg.FS('writeFile', file.name, new Uint8Array(await file.arrayBuffer()));
 
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('bg-gray-200');
-            const files = e.dataTransfer.files;
-            handleFiles({ target: { files } });
-        });
+                    // Construct FFmpeg command based on file type and level
+                    const outputFileName = `compressed-${file.name}`;
+                    const command = getFFmpegCommand(file.type, options.level, file.name, outputFileName);
+                    
+                    self.postMessage({ type: 'start', fileId });
+                    await ffmpeg.run(...command);
+                    self.postMessage({ type: 'processing', fileId });
+                    
+                    const data = ffmpeg.FS('readFile', outputFileName);
+                    ffmpeg.FS('unlink', file.name);
+                    ffmpeg.FS('unlink', outputFileName);
+                    
+                    const compressedBlob = new Blob([data.buffer], { type: file.type });
+                    
+                    self.postMessage({ type: 'done', compressedBlob, fileId });
 
-        function handleFiles(e) {
-            const files = e.target.files;
-            for (const file of files) {
-                if (file.type === 'application/pdf') {
-                    addFileToList(file);
+                } catch (error) {
+                    console.error('FFmpeg Worker Error:', error);
+                    self.postMessage({ type: 'error', message: error.message, fileId });
                 }
             }
-        }
+        };
 
-        function addFileToList(file) {
-            const id = fileCounter++;
-            const fileItem = document.createElement('div');
-            fileItem.className = 'bg-white p-4 rounded shadow mb-4';
-            fileItem.innerHTML = `
-                <p class="font-semibold truncate">${file.name}</p>
-                <p class="text-sm">Original size: ${(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                <div class="w-full bg-gray-200 h-2 mt-2 rounded">
-                    <div class="bg-blue-500 h-2 rounded" style="width: 0%"></div>
-                </div>
-                <p id="status-${id}" class="text-sm mt-1">Processing...</p>
-                <a id="download-${id}" class="mt-2 inline-block px-4 py-1 bg-green-500 text-white rounded text-sm" href="#" download="compressed_${file.name}" style="display: none;">Download</a>
-            `;
-            fileList.appendChild(fileItem);
-            compressFile(file, fileItem, id);
-        }
+        function getFFmpegCommand(fileType, level, inputName, outputName) {
+            const commands = {
+                video: {
+                    1: ['-i', inputName, '-preset', 'ultrafast', '-crf', '30', outputName],
+                    2: ['-i', inputName, '-preset', 'fast', '-crf', '28', outputName],
+                    3: ['-i', inputName, '-preset', 'medium', '-crf', '26', outputName],
+                    4: ['-i', inputName, '-preset', 'slow', '-crf', '24', outputName],
+                    5: ['-i', inputName, '-preset', 'slower', '-crf', '22', outputName],
+                    6: ['-i', inputName, '-preset', 'veryslow', '-crf', '20', outputName],
+                },
+                audio: {
+                    1: ['-i', inputName, '-b:a', '192k', outputName],
+                    2: ['-i', inputName, '-b:a', '160k', outputName],
+                    3: ['-i', inputName, '-b:a', '128k', outputName],
+                    4: ['-i', inputName, '-b:a', '96k', outputName],
+                    5: ['-i', inputName, '-b:a', '64k', outputName],
+                    6: ['-i', inputName, '-b:a', '48k', outputName],
+                }
+            };
 
-        async function compressFile(file, fileItem, id) {
-            const reader = new FileReader();
-            reader.onload = function() {
-                const pdfData = reader.result;
-                const worker = new Worker(workerURL);
-                worker.onmessage = function(e) {
-                    const message = e.data;
-                    if (message.type === 'progress') {
-                        const progress = (message.current / message.total * 100).toFixed(2);
-                        fileItem.querySelector('.bg-blue-500').style.width = `${progress}%`;
-                    } else if (message.type === 'done') {
-                        const compressedPdf = message.data;
-                        const blob = new Blob([compressedPdf], { type: 'application/pdf' });
-                        const url = URL.createObjectURL(blob);
-                        const downloadLink = fileItem.querySelector(`#download-${id}`);
-                        downloadLink.href = url;
-                        downloadLink.style.display = 'inline-block';
-                        const originalSize = file.size;
-                        const newSize = compressedPdf.byteLength;
-                        const ratio = (newSize / originalSize * 100).toFixed(2);
-                        fileItem.querySelector(`#status-${id}`).innerHTML = `Compressed: ${(newSize / 1024 / 1024).toFixed(2)} MB, Ratio: ${ratio}%`;
+            const typeKey = fileType.startsWith('video') ? 'video' : 'audio';
+            return commands[typeKey][level] || commands[typeKey][3]; // Default to balanced
+        }
+    </script>
+    
+
+    <script type="module">
+        // Main application logic
+        const fileUploader = document.getElementById('fileUploader');
+        const fileInput = document.getElementById('fileInput');
+        const selectFileBtn = document.getElementById('selectFileBtn');
+        const dropZone = fileUploader;
+        const controlsAndFileList = document.getElementById('controlsAndFileList');
+        const fileListContainer = document.getElementById('fileListContainer');
+        const compressBtn = document.getElementById('compressBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const compressionLevelSlider = document.getElementById('compressionLevel');
+        const ffmpegLogContainer = document.getElementById('ffmpegLogContainer');
+        const ffmpegLog = document.getElementById('ffmpegLog');
+
+        let filesToProcess = [];
+        let ffmpegWorker = null;
+        let isFfmpegLoaded = false;
+        
+        // --- UTILITY FUNCTIONS ---
+        const formatBytes = (bytes, decimals = 2) => {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        };
+
+        const getFileType = (file) => {
+            const type = file.type;
+            if (type.startsWith('image/')) return 'image';
+            if (type.startsWith('audio/')) return 'audio';
+            if (type.startsWith('video/')) return 'video';
+            if (type === 'application/pdf') return 'pdf';
+            const extension = file.name.split('.').pop().toLowerCase();
+            if (['zip', 'rar'].includes(extension)) return 'archive';
+            if (['docx', 'xlsx', 'pptx'].includes(extension)) return 'document';
+            return 'other';
+        };
+
+        const getFileIcon = (category) => {
+            const icons = {
+                image: '<i class="ph-fill ph-image text-4xl text-teal-500"></i>',
+                document: '<i class="ph-fill ph-file-text text-4xl text-blue-500"></i>',
+                audio: '<i class="ph-fill ph-file-audio text-4xl text-purple-500"></i>',
+                video: '<i class="ph-fill ph-file-video text-4xl text-red-500"></i>',
+                archive: '<i class="ph-fill ph-archive text-4xl text-orange-500"></i>',
+                pdf: '<i class="ph-fill ph-file-pdf text-4xl text-yellow-500"></i>',
+                other: '<i class="ph-fill ph-file text-4xl text-gray-500"></i>'
+            };
+            return icons[category] || icons['other'];
+        };
+
+        // --- WEB WORKER INITIALIZATION for FFmpeg ---
+        const initializeFfmpegWorker = () => {
+            if (!ffmpegWorker) {
+                const workerScript = document.getElementById('ffmpeg-worker').textContent;
+                const workerBlob = new Blob([workerScript], { type: 'application/javascript' });
+                ffmpegWorker = new Worker(URL.createObjectURL(workerBlob));
+                
+                showFfmpegLog('Memuat mesin kompresi video/audio...');
+                ffmpegWorker.postMessage({ type: 'load' });
+
+                ffmpegWorker.onmessage = (e) => {
+                    const { type, message, fileId, compressedBlob } = e.data;
+                    if (type === 'loaded') {
+                        isFfmpegLoaded = true;
+                        updateFileStatus(null, 'ready', 'Mesin kompresi siap.');
+                        showFfmpegLog('Mesin kompresi video/audio berhasil dimuat!');
+                    } else if (type === 'log') {
+                        // We can optionally display detailed logs
+                        // console.log(`FFMPEG [${fileId}]:`, message);
+                    } else if (type === 'start') {
+                        updateFileStatus(fileId, 'processing', 'Memulai kompresi...');
+                    } else if (type === 'processing') {
+                         updateFileStatus(fileId, 'processing', 'Memproses file...');
+                    } else if (type === 'done') {
+                        handleCompressionSuccess(fileId, compressedBlob);
+                    } else if (type === 'error') {
+                        handleCompressionError(fileId, `Error FFmpeg: ${message}`);
                     }
                 };
-                worker.postMessage({ pdfData });
-            };
-            reader.readAsArrayBuffer(file);
+            }
+        };
+        
+        const showFfmpegLog = (message) => {
+            ffmpegLogContainer.classList.remove('hidden');
+            ffmpegLog.textContent += `\n> ${message}`;
+            ffmpegLogContainer.scrollTop = ffmpegLogContainer.scrollHeight;
         }
 
-        const workerScript = `
-            importScripts('https://unpkg.com/pdfjs-dist/build/pdf.min.js');
-            importScripts('https://unpkg.com/pdf-lib/dist/pdf-lib.min.js');
-            importScripts('https://unpkg.com/fflate/umd/index.js');
+        // --- UI RENDERING & UPDATES ---
+        const renderFileList = () => {
+            controlsAndFileList.classList.toggle('hidden', filesToProcess.length === 0);
+            fileUploader.classList.toggle('hidden', filesToProcess.length > 0);
+            fileListContainer.innerHTML = '';
+            filesToProcess.forEach(fileObj => {
+                fileListContainer.insertAdjacentHTML('beforeend', createFileItemHTML(fileObj));
+            });
+        };
 
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist/build/pdf.worker.min.js';
+        const createFileItemHTML = (fileObj) => {
+            const fileCategory = getFileType(fileObj.file);
+            const icon = getFileIcon(fileCategory);
+            return `
+                <div id="file-${fileObj.id}" class="file-item bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg flex flex-col md:flex-row items-center gap-4">
+                    <div class="flex-shrink-0">${icon}</div>
+                    <div class="flex-grow text-center md:text-left">
+                        <p class="font-semibold text-gray-800 dark:text-gray-200 truncate" title="${fileObj.file.name}">${fileObj.file.name}</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Ukuran Asli: ${formatBytes(fileObj.file.size)}</p>
+                    </div>
+                    <div class="status-indicator w-full md:w-1/3 text-center">
+                        <p class="status-text text-sm text-gray-600 dark:text-gray-400">Menunggu...</p>
+                        <div class="progress-bar w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5 mt-1 hidden">
+                            <div class="progress-bar-inner bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="result-display w-full md:w-auto text-center">
+                        <!-- Result will be shown here -->
+                    </div>
+                </div>
+            `;
+        };
 
-            self.onmessage = function(e) {
-                const pdfData = e.data.pdfData;
-                pdfjsLib.getDocument({ data: pdfData }).promise.then(function(pdfDoc) {
-                    const numPages = pdfDoc.numPages;
-                    PDFLib.PDFDocument.create().then(function(newPdfDoc) {
-                        const promises = [];
-                        for (let i = 1; i <= numPages; i++) {
-                            promises.push(
-                                pdfDoc.getPage(i).then(function(page) {
-                                    self.postMessage({ type: 'progress', current: i, total: numPages });
-                                    const viewport = page.getViewport({ scale: 0.7 });
-                                    const offscreenCanvas = new OffscreenCanvas(viewport.width, viewport.height);
-                                    const context = offscreenCanvas.getContext('2d');
-                                    return page.render({ canvasContext: context, viewport }).promise.then(function() {
-                                        return offscreenCanvas.convertToBlob({ type: 'image/jpeg', quality: 0.7 });
-                                    }).then(function(blob) {
-                                        return new Response(blob).arrayBuffer();
-                                    }).then(function(arrayBuffer) {
-                                        return newPdfDoc.embedJpg(arrayBuffer).then(function(jpgImage) {
-                                            const newPage = newPdfDoc.addPage([viewport.width, viewport.height]);
-                                            newPage.drawImage(jpgImage, {
-                                                x: 0,
-                                                y: 0,
-                                                width: viewport.width,
-                                                height: viewport.height,
-                                            });
-                                        });
-                                    });
-                                })
-                            );
-                        }
-                        Promise.all(promises).then(function() {
-                            newPdfDoc.save().then(function(compressedPdf) {
-                                self.postMessage({ type: 'done', data: compressedPdf });
-                            });
-                        });
-                    });
+        const updateFileStatus = (fileId, status, message, progress = -1) => {
+             // If fileId is null, update all files that are waiting for ffmpeg
+            if (fileId === null) {
+                filesToProcess.forEach(f => {
+                    const fileCategory = getFileType(f.file);
+                    if ((fileCategory === 'video' || fileCategory === 'audio') && f.status === 'pending') {
+                       updateSingleFileStatus(f.id, status, message, progress);
+                    }
                 });
-            };
-        `;
+                return;
+            }
+            updateSingleFileStatus(fileId, status, message, progress);
+        };
+        
+        const updateSingleFileStatus = (fileId, status, message, progress) => {
+            const fileElement = document.getElementById(`file-${fileId}`);
+            if (!fileElement) return;
 
-        const blob = new Blob([workerScript], { type: 'application/javascript' });
-        const workerURL = URL.createObjectURL(blob);
+            const statusText = fileElement.querySelector('.status-text');
+            const progressBar = fileElement.querySelector('.progress-bar');
+            const progressBarInner = fileElement.querySelector('.progress-bar-inner');
+
+            statusText.textContent = message;
+            if (progress >= 0) {
+                progressBar.classList.remove('hidden');
+                progressBarInner.style.width = `${progress}%`;
+            } else {
+                progressBar.classList.add('hidden');
+            }
+        };
+
+        // --- FILE HANDLING ---
+        const handleFiles = (selectedFiles) => {
+            let needsFfmpeg = false;
+            for (const file of selectedFiles) {
+                const fileId = Date.now() + Math.random();
+                const fileCategory = getFileType(file);
+                
+                if (fileCategory === 'other') {
+                    alert(`File "${file.name}" tidak didukung.`);
+                    continue;
+                }
+                
+                if(fileCategory === 'video' || fileCategory === 'audio') {
+                    needsFfmpeg = true;
+                }
+
+                filesToProcess.push({
+                    id: fileId,
+                    file: file,
+                    status: 'pending' // pending, processing, done, error
+                });
+            }
+            
+            if(needsFfmpeg && !ffmpegWorker) {
+                initializeFfmpegWorker();
+            }
+
+            renderFileList();
+        };
+
+        // --- COMPRESSION LOGIC ---
+        const startCompression = () => {
+            const level = compressionLevelSlider.value;
+            compressBtn.disabled = true;
+            compressBtn.innerHTML = '<i class="ph-spinner-gap animate-spin"></i> Mengompres...';
+
+            const compressionPromises = filesToProcess.map(fileObj => {
+                return compressFile(fileObj, level).catch(error => {
+                    handleCompressionError(fileObj.id, error.message);
+                });
+            });
+
+            Promise.allSettled(compressionPromises).then(() => {
+                compressBtn.disabled = false;
+                compressBtn.innerHTML = '<i class="ph-play-fill"></i> Mulai Kompresi';
+            });
+        };
+
+        const compressFile = async (fileObj, level) => {
+            updateFileStatus(fileObj.id, 'processing', 'Mempersiapkan...', 0);
+            const fileCategory = getFileType(fileObj.file);
+
+            switch (fileCategory) {
+                case 'image':
+                    return compressImage(fileObj, level);
+                case 'document':
+                case 'archive':
+                    return compressZip(fileObj, level);
+                case 'video':
+                case 'audio':
+                    if (!isFfmpegLoaded) {
+                        updateFileStatus(fileObj.id, 'pending', 'Menunggu mesin kompresi...');
+                        // Will be picked up once worker is loaded
+                        return;
+                    }
+                    ffmpegWorker.postMessage({ type: 'compress', file: fileObj.file, options: { level }, fileId: fileObj.id });
+                    break;
+                case 'pdf':
+                    handleCompressionError(fileObj.id, 'Kompresi PDF belum didukung sepenuhnya.');
+                    break;
+                default:
+                    handleCompressionError(fileObj.id, 'Tipe file tidak didukung.');
+            }
+        };
+
+        const compressImage = (fileObj, level) => {
+            return new Promise((resolve, reject) => {
+                const qualityMap = { 1: 0.9, 2: 0.8, 3: 0.7, 4: 0.6, 5: 0.5, 6: 0.4 };
+                const quality = qualityMap[level] || 0.7;
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        updateFileStatus(fileObj.id, 'processing', 'Menggambar ulang gambar...', 50);
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+                        
+                        // Convert to blob
+                        canvas.toBlob(
+                            (blob) => {
+                                handleCompressionSuccess(fileObj.id, blob);
+                                resolve();
+                            },
+                            'image/jpeg', // Force JPEG for compression, WebP is also a good option.
+                            quality
+                        );
+                    };
+                    img.onerror = () => reject(new Error('Gagal memuat gambar.'));
+                    img.src = e.target.result;
+                    updateFileStatus(fileObj.id, 'processing', 'Memuat gambar...', 25);
+                };
+                reader.onerror = () => reject(new Error('Gagal membaca file gambar.'));
+                reader.readAsDataURL(fileObj.file);
+            });
+        };
+        
+        const compressZip = (fileObj, level) => {
+            return new Promise(async (resolve, reject) => {
+                try {
+                    updateFileStatus(fileObj.id, 'processing', 'Membaca arsip...', 20);
+                    const jszip = new JSZip();
+                    const zip = await jszip.loadAsync(fileObj.file);
+                    
+                    updateFileStatus(fileObj.id, 'processing', 'Mengompres ulang...', 60);
+                    // Map level to JSZip compression level
+                    const compressionLevel = Math.round(9 - (level - 1) * (8 / 5)); // Maps 1-6 to 9-1
+                    
+                    const blob = await zip.generateAsync({
+                        type: 'blob',
+                        compression: 'DEFLATE',
+                        compressionOptions: { level: compressionLevel },
+                         onUpdate: (metadata) => {
+                             updateFileStatus(fileObj.id, 'processing', 'Mengompres ulang...', 60 + (metadata.percent * 0.3));
+                         }
+                    });
+                    
+                    handleCompressionSuccess(fileObj.id, blob);
+                    resolve();
+                } catch(e) {
+                    reject(new Error('Gagal memproses file arsip.'));
+                }
+            });
+        };
+
+        const handleCompressionSuccess = (fileId, compressedBlob) => {
+            const fileObj = filesToProcess.find(f => f.id === fileId);
+            if (!fileObj) return;
+
+            const originalSize = fileObj.file.size;
+            const compressedSize = compressedBlob.size;
+            const reduction = 100 - (compressedSize / originalSize) * 100;
+            
+            updateFileStatus(fileId, 'done', 'Selesai!', 100);
+
+            const fileElement = document.getElementById(`file-${fileId}`);
+            const resultDisplay = fileElement.querySelector('.result-display');
+            const downloadUrl = URL.createObjectURL(compressedBlob);
+            
+            resultDisplay.innerHTML = `
+                <div class="text-center">
+                    <p class="font-semibold text-green-600 dark:text-green-400">${formatBytes(compressedSize)}</p>
+                    <p class="text-sm text-green-500">(${reduction.toFixed(1)}% lebih kecil)</p>
+                    <a href="${downloadUrl}" download="compressed-${fileObj.file.name}" class="inline-block mt-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg text-sm">
+                        Download
+                    </a>
+                </div>
+            `;
+        };
+
+        const handleCompressionError = (fileId, message) => {
+            const fileObj = filesToProcess.find(f => f.id === fileId);
+            if (!fileObj) return;
+            
+            fileObj.status = 'error';
+            updateFileStatus(fileId, 'error', message);
+
+            const fileElement = document.getElementById(`file-${fileId}`);
+            const resultDisplay = fileElement.querySelector('.result-display');
+            resultDisplay.innerHTML = `<p class="text-red-500 font-semibold text-sm">Gagal</p>`;
+        };
+
+        // --- EVENT LISTENERS ---
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drop-zone-over');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drop-zone-over');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drop-zone-over');
+            const files = e.dataTransfer.files;
+            if (files.length) {
+                handleFiles(files);
+            }
+        });
+        
+        selectFileBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) {
+                handleFiles(e.target.files);
+                fileInput.value = ''; // Reset input
+            }
+        });
+        
+        compressBtn.addEventListener('click', startCompression);
+        
+        clearBtn.addEventListener('click', () => {
+            filesToProcess = [];
+            renderFileList();
+            ffmpegLogContainer.classList.add('hidden');
+            ffmpegLog.textContent = '';
+        });
     </script>
+
 </body>
 </html>
