@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Compressor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-4">
+        <h1 class="text-2xl font-bold mb-4">PDF Compressor</h1>
+        <div id="upload-area" class="border-2 border-dashed border-gray-300 p-6 text-center cursor-pointer hover:bg-gray-50">
+            <p>Drag and drop PDF files here or click to select</p>
+            <input type="file" id="file-input" multiple accept=".pdf" class="hidden">
+        </div>
+        <div id="file-list" class="mt-4"></div>
+    </div>
+    <script>
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('file-input');
+        const fileList = document.getElementById('file-list');
+        let fileCounter = 0;
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', handleFiles);
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('bg-gray-200');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('bg-gray-200');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('bg-gray-200');
+            const files = e.dataTransfer.files;
+            handleFiles({ target: { files } });
+        });
+
+        function handleFiles(e) {
+            const files = e.target.files;
+            for (const file of files) {
+                if (file.type === 'application/pdf') {
+                    addFileToList(file);
+                }
+            }
+        }
+
+        function addFileToList(file) {
+            const id = fileCounter++;
+            const fileItem = document.createElement('div');
+            fileItem.className = 'bg-white p-4 rounded shadow mb-4';
+            fileItem.innerHTML = `
+                <p class="font-semibold truncate">${file.name}</p>
+                <p class="text-sm">Original size: ${(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                <div class="w-full bg-gray-200 h-2 mt-2 rounded">
+                    <div class="bg-blue-500 h-2 rounded" style="width: 0%"></div>
+                </div>
+                <p id="status-${id}" class="text-sm mt-1">Processing...</p>
+                <a id="download-${id}" class="mt-2 inline-block px-4 py-1 bg-green-500 text-white rounded text-sm" href="#" download="compressed_${file.name}" style="display: none;">Download</a>
+            `;
+            fileList.appendChild(fileItem);
+            compressFile(file, fileItem, id);
+        }
+
+        async function compressFile(file, fileItem, id) {
+            const reader = new FileReader();
+            reader.onload = function() {
+                const pdfData = reader.result;
+                const worker = new Worker(workerURL);
+                worker.onmessage = function(e) {
+                    const message = e.data;
+                    if (message.type === 'progress') {
+                        const progress = (message.current / message.total * 100).toFixed(2);
+                        fileItem.querySelector('.bg-blue-500').style.width = `${progress}%`;
+                    } else if (message.type === 'done') {
+                        const compressedPdf = message.data;
+                        const blob = new Blob([compressedPdf], { type: 'application/pdf' });
+                        const url = URL.createObjectURL(blob);
+                        const downloadLink = fileItem.querySelector(`#download-${id}`);
+                        downloadLink.href = url;
+                        downloadLink.style.display = 'inline-block';
+                        const originalSize = file.size;
+                        const newSize = compressedPdf.byteLength;
+                        const ratio = (newSize / originalSize * 100).toFixed(2);
+                        fileItem.querySelector(`#status-${id}`).innerHTML = `Compressed: ${(newSize / 1024 / 1024).toFixed(2)} MB, Ratio: ${ratio}%`;
+                    }
+                };
+                worker.postMessage({ pdfData });
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        const workerScript = `
+            importScripts('https://unpkg.com/pdfjs-dist/build/pdf.min.js');
+            importScripts('https://unpkg.com/pdf-lib/dist/pdf-lib.min.js');
+            importScripts('https://unpkg.com/fflate/umd/index.js');
+
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist/build/pdf.worker.min.js';
+
+            self.onmessage = function(e) {
+                const pdfData = e.data.pdfData;
+                pdfjsLib.getDocument({ data: pdfData }).promise.then(function(pdfDoc) {
+                    const numPages = pdfDoc.numPages;
+                    PDFLib.PDFDocument.create().then(function(newPdfDoc) {
+                        const promises = [];
+                        for (let i = 1; i <= numPages; i++) {
+                            promises.push(
+                                pdfDoc.getPage(i).then(function(page) {
+                                    self.postMessage({ type: 'progress', current: i, total: numPages });
+                                    const viewport = page.getViewport({ scale: 0.7 });
+                                    const offscreenCanvas = new OffscreenCanvas(viewport.width, viewport.height);
+                                    const context = offscreenCanvas.getContext('2d');
+                                    return page.render({ canvasContext: context, viewport }).promise.then(function() {
+                                        return offscreenCanvas.convertToBlob({ type: 'image/jpeg', quality: 0.7 });
+                                    }).then(function(blob) {
+                                        return new Response(blob).arrayBuffer();
+                                    }).then(function(arrayBuffer) {
+                                        return newPdfDoc.embedJpg(arrayBuffer).then(function(jpgImage) {
+                                            const newPage = newPdfDoc.addPage([viewport.width, viewport.height]);
+                                            newPage.drawImage(jpgImage, {
+                                                x: 0,
+                                                y: 0,
+                                                width: viewport.width,
+                                                height: viewport.height,
+                                            });
+                                        });
+                                    });
+                                })
+                            );
+                        }
+                        Promise.all(promises).then(function() {
+                            newPdfDoc.save().then(function(compressedPdf) {
+                                self.postMessage({ type: 'done', data: compressedPdf });
+                            });
+                        });
+                    });
+                });
+            };
+        `;
+
+        const blob = new Blob([workerScript], { type: 'application/javascript' });
+        const workerURL = URL.createObjectURL(blob);
+    </script>
+</body>
+</html>
